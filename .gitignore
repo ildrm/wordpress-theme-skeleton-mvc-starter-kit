@@ -1,0 +1,10 @@
+/vendor/
+/node_modules/
+/.phpunit.cache/
+/.phpunit.result.cache
+/test-results/
+/playwright-report/
+/.phpactor.json
+/public/build/*
+!/public/build/.gitkeep
+/.DS_Store

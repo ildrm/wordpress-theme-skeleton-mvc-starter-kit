@@ -1,0 +1,11 @@
+parameters:
+    level: 6
+    paths:
+        - app
+        - bootstrap
+        - config
+        - routes
+    scanFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    excludePaths:
+        - public

@@ -1,0 +1,7 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "ignoreFiles": ["public/build/**/*.css", "node_modules/**/*.css"],
+  "rules": {
+    "selector-class-pattern": "^[a-z][a-z0-9_-]*$"
+  }
+}
