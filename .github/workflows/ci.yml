@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, mysqli, pdo_mysql
+          tools: composer:v2
+          coverage: none
+      - run: composer validate --no-check-publish --strict
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer quality
+
+  assets:
+    name: JavaScript, CSS, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  wordpress:
+    name: WordPress ${{ matrix.wordpress }} integration and browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [php, assets]
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress: ['6.6', 'latest']
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: wordpress
+          MYSQL_USER: wordpress
+          MYSQL_PASSWORD: wordpress
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      WP_ROOT: ${{ runner.temp }}/wordpress
+      WP_BASE_URL: http://127.0.0.1:9400
+      WP_VERSION: ${{ matrix.wordpress }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, mysqli, pdo_mysql
+          tools: composer:v2, wp-cli
+          ini-values: memory_limit=512M
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: npm ci
+      - run: npm run build
+      - name: Install and seed WordPress
+        run: bash scripts/ci/setup-wordpress.sh
+      - name: Start WordPress
+        run: |
+          wp server --path="$WP_ROOT" --host=127.0.0.1 --port=9400 > "$RUNNER_TEMP/wordpress-server.log" 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent --output /dev/null "$WP_BASE_URL/"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/wordpress-server.log"
+          exit 1
+      - run: npm run test:wp
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Show server log on failure
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/wordpress-server.log" ]; then
+            cat "$RUNNER_TEMP/wordpress-server.log"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results-wp-${{ matrix.wordpress }}
+          path: test-results/
+          if-no-files-found: ignore

@@ -145,7 +145,22 @@ WP_BASE_URL=http://127.0.0.1:9400 npm run test:wp
 WP_BASE_URL=http://127.0.0.1:9400 npm run test:e2e
 ```
 
-PHPUnit checks the container, provider lifecycle, configuration, views, routes, and architecture boundaries. The `test:wp` script checks an active theme, seeded post/page/category views, search, 404, built assets, REST authorization, and anonymous AJAX rejection against a running WordPress site. `tests/Browser` has Playwright smoke tests for layout and mobile keyboard navigation. Set `WP_BASE_URL`; if the Playwright browser download is unavailable, set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome executable. These live checks need a WordPress installation with a database. The WPCS ruleset includes Core, Docs, and Extra; narrow exceptions support PSR-4 namespaced class files, typed camelCase APIs, and PHP short arrays while retaining security rules.
+PHPUnit checks the container, provider lifecycle, configuration, views, routes, and architecture boundaries. The `test:wp` script checks an active theme, seeded post/page/category views, search, 404, built assets, REST authorization, and anonymous AJAX rejection against a running WordPress site. `tests/Browser` has Playwright tests for layout, seeded content, no-JavaScript rendering, and mobile keyboard navigation. Set `WP_BASE_URL`; if the Playwright browser download is unavailable, set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome executable. These live checks need a WordPress installation with a database. The WPCS ruleset includes Core, Docs, and Extra; narrow exceptions support PSR-4 namespaced class files, typed camelCase APIs, and PHP short arrays while retaining security rules.
+
+## Continuous integration
+
+GitHub Actions runs on pushes, pull requests, and manual dispatch. PHP 8.2 and 8.4 jobs install from `composer.lock` and run Composer validation, syntax checks, PHPUnit, PHPStan, and PHPCS. A Node 22 job installs from `package-lock.json`, runs JavaScript/CSS lint, and builds assets. WordPress 6.6 and the current release each get an isolated MySQL-backed site; CI activates the theme, seeds a post, page, and category, runs the HTTP smoke test, then runs Playwright in Chromium. All jobs must pass. Failed browser runs upload Playwright results as workflow artifacts. No deployment or repository secrets are required.
+
+To reproduce the live suite locally, install dependencies and build assets, then provide an empty MySQL database named `wordpress` with user/password `wordpress` and run:
+
+```sh
+export WP_ROOT="$(mktemp -d)"
+export WP_BASE_URL=http://127.0.0.1:9400
+bash scripts/ci/setup-wordpress.sh
+wp server --path="$WP_ROOT" --host=127.0.0.1 --port=9400
+```
+
+In another shell, run `npm run test:wp` and `npm run test:e2e` with the same `WP_BASE_URL`. `WP_VERSION` selects the WordPress release (default `6.6`). `WP_DB_HOST`, `WP_DB_NAME`, `WP_DB_USER`, and `WP_DB_PASSWORD` override the database defaults. The setup script is for a fresh, disposable WordPress directory and database.
 
 ## References
 

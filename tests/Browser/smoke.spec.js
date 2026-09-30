@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-test.skip(!process.env.WP_BASE_URL, 'Set WP_BASE_URL to a running WordPress site.');
-
 test('front page has navigation, content, and accessible search', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('main#main-content')).toBeVisible();
@@ -10,9 +8,29 @@ test('front page has navigation, content, and accessible search', async ({ page 
 });
 
 test('search page renders a search form', async ({ page }) => {
-  await page.goto('/?s=example');
+  await page.goto('/?s=CI+Post');
   await expect(page.locator('main#main-content h1')).toBeVisible();
   await expect(page.getByRole('searchbox')).toBeVisible();
+  await expect(page.locator('main#main-content')).toContainText('CI Post');
+});
+
+test('seeded post and page render their content', async ({ page }) => {
+  await page.goto('/ci-post/');
+  await expect(page.locator('main#main-content')).toContainText('A seeded integration post.');
+  await page.goto('/ci-page/');
+  await expect(page.locator('main#main-content')).toContainText('A seeded integration page.');
+});
+
+test('content and navigation remain available without JavaScript', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const page = await context.newPage();
+    await page.goto('/ci-page/');
+    await expect(page.locator('main#main-content')).toContainText('A seeded integration page.');
+    await expect(page.locator('nav[aria-label="Primary navigation"]')).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });
 
 test('mobile navigation opens and closes with keyboard', async ({ page }) => {
